@@ -106,10 +106,6 @@ CDbgCMApp::CDbgCMApp()
 
 CDbgCMApp::~CDbgCMApp()
 {
-    if (rddi::rddi_Close) {
-        rddi::rddi_Close(rddi::k_rddi_handle);
-    }
-
     CloseHandle(Com_mtx);
     CloseHandle(PlayDeadShut_mtx);
 }
@@ -154,11 +150,7 @@ inline BOOL LoadRddiDllFunction()
     RDDILL_GetProcAddress(CMSIS_DAP_Capabilities);
     RDDILL_GetProcAddress(CMSIS_DAP_DetectNumberOfDAPs);
     RDDILL_GetProcAddress(CMSIS_DAP_DetectDAPIDList);
-
-    if (rddi::rddi_Open(&rddi::k_rddi_handle, NULL)) {
-        return FALSE;
-    }
-
+    RDDILL_GetProcAddress(CMSIS_DAP_Commands);
 
     return TRUE;
 }
@@ -174,6 +166,26 @@ BOOL CDbgCMApp::InitInstance()
     return TRUE;
 }
 
+bool RddiOpenInstance()
+{
+    int ret;
+    ret = rddi::rddi_Open(&rddi::k_rddi_handle, NULL);
+
+    if (ret == RDDI_TOOMANYCONNECTIONS) {
+        return true; // FIXME
+    } else if (ret != RDDI_SUCCESS) {
+        AfxMessageBox("Can not connect to elaphureLink proxy");
+        return false;
+    }
+
+    return true;
+}
+
+
+void RddiCloseInstance()
+{
+    rddi::rddi_Close(rddi::k_rddi_handle);
+}
 
 
 /*
@@ -556,10 +568,10 @@ void WriteParms(char *pArgs)
 int DoDlgSetup(void)
 {
     int i;
-    //CSetup     dlg;
-    CSetupPS dlg(0);
+    CSetup     dlg;
+    //CSetupPS dlg(0);
 
-    //dlg.page = 0;                // Start with Debug Page
+    dlg.page = 0;                // Start with Debug Page
     i = dlg.DoModal(); // run the target setup dialog...
     return (i);        // IDOK or IDCANCEL
 }
@@ -572,10 +584,10 @@ int DoDlgSetup(void)
 int DoFDlgSetup(void)
 {
     int i;
-    //CSetup     dlg;
-    CSetupPS dlg(2);
+    CSetup     dlg;
+    //CSetupPS dlg(2);
 
-    //dlg.page = 2;                // Start with Flash Download Page
+    dlg.page = 2;                // Start with Flash Download Page
     i = dlg.DoModal(); // run the flash download setup dialog...
     return (i);        // IDOK or IDCANCEL
 }

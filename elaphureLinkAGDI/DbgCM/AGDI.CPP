@@ -54,6 +54,7 @@
 #include "BreakResources.h"
 #include "..\TracePointDefs.h"
 #include "rddi_dll.hpp"
+#include "dap.hpp"
 
 #if DBGCM_RECOVERY
 #include "DebugAccess.h"
@@ -1483,7 +1484,10 @@ U32 InitTarget(void)
     //  strcpy(MonConf.UnitSerNo, "Any");
     //  active unit = 0
     //}
-    DEVELOP_MSG("Todo: \nInit Target and configure according MonConf (Debug Port & Clock ...)\nreturn(1); if init fails.");
+    status = PDSCDebug_InitDebugger();
+    if (status) {
+        return status;
+    }
 
     if (MonConf.Opt & INIT_RST_PULSE) {
         //---TODO:
@@ -1559,9 +1563,8 @@ U32 InitTarget(void)
                 MonConf.JtagCpuIndex = JTAG_devs.cnt - 1;
             }
         }
-        //---TODO:
         // Select active device in chain according to MonConf.JtagCpuIndex if ID JTAG is valid
-        DEVELOP_MSG("Todo: \nSelect active device in chain according to MonConf.JtagCpuIndex if ID JTAG is valid");
+        // RDDI will handle this automatically, no need to send the sequence again
         status = JTAG_ReadID();
         if (status) {
             OutErrorMessage(status);
@@ -2285,10 +2288,8 @@ void StopTarget(void)
     if (status)
         OutError(status);
 
-    //---TODO:
     // UnInit Target
-    DEVELOP_MSG("Todo: \nUnInit Target");
-    rddi::rddi_Close(rddi::k_rddi_handle);
+    // rddi::rddi_Close(rddi::k_rddi_handle);
 }
 
 
@@ -2361,12 +2362,22 @@ DWORD ResetTarget(void)
 
     switch (MonConf.Opt & RESET_TYPE) {
         case RESET_HW:
-            //---TODO:
             // HW Chip Reset
-            DEVELOP_MSG("Todo: \nHW Chip Reset");
-            if (status)
-                goto end;
-            break;
+            {
+                uint8_t  reset_command = ID_DAP_ResetTarget;
+                uint8_t *command_array = &reset_command;
+                int      req_len       = 1;
+
+                uint8_t  response_command       = 0; // unused
+                uint8_t *response_command_array = &reset_command;
+                int      res_len                = 1;
+
+                status = rddi::CMSIS_DAP_Commands(rddi::k_rddi_handle, 1, &command_array, &req_len, &response_command_array, &res_len);
+                if (status)
+                    goto end;
+                break;
+            }
+
         case RESET_SW_SYS:
             val = SYSRESETREQ;
 

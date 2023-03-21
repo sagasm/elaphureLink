@@ -56,6 +56,7 @@
 #include "SWD.h"
 #include "DbgCM.h"
 #include "BreakResources.h"
+#include "dap.hpp"
 
 #if DBGCM_RECOVERY
 #include "DebugAccess.h"
@@ -2191,6 +2192,8 @@ U32 PDSCDebug_UnInit(void)
 
     _MemCleanup();
 
+    RddiCloseInstance();
+
     PDSCDebug_Initialized = false;
     return (0);
 }
@@ -2748,7 +2751,8 @@ inline void interface_name_cov(char *str)
     }
 }
 
-// Initialize debug adapter
+// This function is a generic debug adapter initialization function
+// which is used in a non-GUI environment.
 U32 PDSCDebug_InitDebugger(void)
 {
     OutMsg("");
@@ -2758,7 +2762,10 @@ U32 PDSCDebug_InitDebugger(void)
     int numOfIFs = 0;
     int if_index = 0, i = 0;
 
-    rddi::rddi_Open(&rddi::k_rddi_handle, NULL);
+    if (!RddiOpenInstance()) {
+        return EU02;
+    }
+
     rddi::CMSIS_DAP_Detect(rddi::k_rddi_handle, &numOfIFs);
     if (numOfIFs == 0) {
         return EU02;
@@ -2802,7 +2809,7 @@ U32 PDSCDebug_InitDebugger(void)
 U32 PDSCDebug_UnInitDebugger(void)
 {
     // Uninit Debug Unit
-    rddi::rddi_Close(rddi::k_rddi_handle);
+    // rddi::rddi_Close(rddi::k_rddi_handle);
     return (0);
 }
 
@@ -3462,7 +3469,7 @@ U32 _InitInternals(void)
 
     if (!pio->FlashLoad) { // 25.01.2019: Don't check supported trace settings for flash download
         //---TODO: Check if trace settings are supported by debugger
-        DEVELOP_MSG("Todo: \nCheck if trace settings are supported by debugger");
+        // DEVELOP_MSG("Todo: \nCheck if trace settings are supported by debugger");
     }
 
 end:
@@ -4007,9 +4014,17 @@ U32 PDSCDebug_ResetHardware(BYTE bPreReset)
 
     // Execute default functionality
 
-    //---TODO:
     // HW Chip Reset
-    DEVELOP_MSG("Todo: \nHW Chip Reset");
+    uint8_t  reset_command = ID_DAP_ResetTarget;
+    uint8_t *command_array = &reset_command;
+    int      req_len       = 1;
+
+    uint8_t  response_command       = 0; // unused
+    uint8_t *response_command_array = &reset_command;
+    int      res_len                = 1;
+
+    rddi::CMSIS_DAP_Commands(rddi::k_rddi_handle, 1, &command_array, &req_len, &response_command_array, &res_len);
+
 
     if (!bPreReset) { // Doesn't make sense to recover here. We haven't connected yet.
         status = _ResetRecovery();
